@@ -1,0 +1,56 @@
+# Android / Kotlin
+*.iml
+*.class
+*.kotlin_module
+*.jar
+*.aar
+*.apk
+*.aab
+*.apk_
+*.dex
+bin/
+gen/
+out/
+release/
+proguard/
+
+# Gradle
+.gradle/
+build/
+local.properties
+
+# IDE
+.idea/
+*.swp
+*.swo
+*~
+
+# Node.js (MCP Server)
+node_modules/
+mcp-server/node_modules/
+mcp-server/dist/
+mcp-server/build/
+mcp-server/*.js
+mcp-server/*.js.map
+
+# OpenCode
+.opencode/
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Env
+.env
+.env.*
+
+# Logs
+*.log
+*.logs
+
+# Test reports
+*.html
+
+# Coverage
+jacoco/
