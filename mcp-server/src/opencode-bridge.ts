@@ -36,7 +36,7 @@ export class OpencodeBridge extends EventEmitter {
     this.config = {
       opencodePath: config.opencodePath || 'opencode',
       projectPath: config.projectPath || process.cwd(),
-      model: config.model || 'nvidia/minimaxai/minimax-m3',
+      model: config.model || 'opencode/deepseek-v4-flash-free',
     };
   }
 
@@ -50,7 +50,7 @@ export class OpencodeBridge extends EventEmitter {
   async sendPrompt(prompt: string, sessionId?: string, model?: string): Promise<void> {
     const cmd = this.config.opencodePath!;
     const effectiveModel = model || this.config.model!;
-    const args = ['run', '--format', 'json', '--model', effectiveModel];
+    const args = ['run', '--format', 'json', '--dangerously-skip-permissions', '--model', effectiveModel];
     if (sessionId) {
       args.push('--session', sessionId, '--continue');
     }
@@ -100,8 +100,22 @@ export class OpencodeBridge extends EventEmitter {
     };
 
     proc.stdout?.on('data', onData);
-    proc.stderr?.on('data', (data: Buffer) => {});
-    proc.on('close', () => {
+    proc.stderr?.on('data', (data: Buffer) => {
+      const msg = data.toString().trim();
+      if (msg) {
+        this.emit('message', { type: 'error', error: msg, session_id: actualSessionId || sid });
+      }
+    });
+    proc.on('close', (code) => {
+      if (code !== 0 && buffer.trim()) {
+        // попытка распарсить последний буфер как ошибку
+        try {
+          const err = JSON.parse(buffer.trim());
+          if (err?.data?.message) {
+            this.emit('message', { type: 'error', error: err.data.message, session_id: actualSessionId || sid });
+          }
+        } catch {}
+      }
       this.emit('done', { session_id: actualSessionId || sid });
     });
     proc.on('error', (err: NodeJS.ErrnoException) => {

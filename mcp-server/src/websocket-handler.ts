@@ -100,6 +100,10 @@ export class WsHandler {
           await this.handleSessionList(session);
           break;
 
+        case 'session_new':
+          this.send(session, { type: 'session_new', success: true });
+          break;
+
         case 'session_delete':
           await this.handleSessionDelete(session, msg);
           break;

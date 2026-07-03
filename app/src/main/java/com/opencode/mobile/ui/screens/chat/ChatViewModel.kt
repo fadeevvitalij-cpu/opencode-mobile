@@ -159,6 +159,9 @@ class ChatViewModel(application: Application, private val connectionId: Long) : 
                 "session_deleted" -> {
                     loadSessions()
                 }
+                "session_new", "connected", "auth" -> {
+                    // игнорируем — эти типы не требуют обработки на UI
+                }
                 else -> {
                     response.sessionId?.let {
                         _currentSessionId.value = it
