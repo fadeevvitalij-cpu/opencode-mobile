@@ -36,7 +36,7 @@ export class OpencodeBridge extends EventEmitter {
     this.config = {
       opencodePath: config.opencodePath || 'opencode',
       projectPath: config.projectPath || process.cwd(),
-      model: config.model || 'opencode/deepseek-v4-flash-free',
+      model: config.model,
     };
   }
 
@@ -49,8 +49,11 @@ export class OpencodeBridge extends EventEmitter {
 
   async sendPrompt(prompt: string, sessionId?: string, model?: string): Promise<void> {
     const cmd = this.config.opencodePath!;
-    const effectiveModel = model || this.config.model!;
-    const args = ['run', '--format', 'json', '--dangerously-skip-permissions', '--model', effectiveModel];
+    const effectiveModel = model || this.config.model;
+    const args = ['run', '--format', 'json', '--dangerously-skip-permissions'];
+    if (effectiveModel) {
+      args.push('--model', effectiveModel);
+    }
     if (sessionId) {
       args.push('--session', sessionId, '--continue');
     }
