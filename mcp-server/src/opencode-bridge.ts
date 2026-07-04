@@ -59,10 +59,15 @@ export class OpencodeBridge extends EventEmitter {
     }
     args.push(prompt);
 
+    // очищаем переменные окружения OpenCode — они ломают дочерние процессы (issue #27829)
+    const cleanEnv = { ...process.env };
+    for (const key of Object.keys(cleanEnv)) {
+      if (key.startsWith('OPENCODE_')) delete cleanEnv[key];
+    }
     const proc = spawn(cmd, args, {
       cwd: this.config.projectPath,
       stdio: ['ignore', 'pipe', 'pipe'],
-      env: { ...process.env },
+      env: cleanEnv,
     });
 
     let buffer = '';
@@ -76,8 +81,9 @@ export class OpencodeBridge extends EventEmitter {
 
       for (const line of lines) {
         if (!line.trim()) continue;
+        const trimmed = line.trim();
         try {
-          const event: OpenCodeEvent = JSON.parse(line);
+          const event: OpenCodeEvent = JSON.parse(trimmed);
           if (!actualSessionId && event.sessionID) actualSessionId = event.sessionID;
           switch (event.type) {
             case 'text':
@@ -98,7 +104,24 @@ export class OpencodeBridge extends EventEmitter {
               this.emit('message', { type: 'error', error: event.error?.data?.message || event.part?.text || 'Unknown error', session_id: actualSessionId || sid });
               break;
           }
-        } catch {}
+        } catch {
+          // не-JSON строка — возможно ошибка с префиксом "Error: "
+          if (trimmed.includes('Error') || trimmed.includes('error') || trimmed.includes('ERR')) {
+            // пытаемся извлечь JSON из строки вида "Error: {...}"
+            const jsonMatch = trimmed.match(/\{.*\}/);
+            if (jsonMatch) {
+              try {
+                const err = JSON.parse(jsonMatch[0]);
+                const msg = err?.data?.message || err?.message || trimmed;
+                this.emit('message', { type: 'error', error: msg, session_id: actualSessionId || sid });
+              } catch {
+                this.emit('message', { type: 'error', error: trimmed, session_id: actualSessionId || sid });
+              }
+            } else {
+              this.emit('message', { type: 'error', error: trimmed, session_id: actualSessionId || sid });
+            }
+          }
+        }
       }
     };
 
@@ -106,18 +129,23 @@ export class OpencodeBridge extends EventEmitter {
     proc.stderr?.on('data', (data: Buffer) => {
       const msg = data.toString().trim();
       if (msg) {
+        console.error(`[Bridge stderr] ${msg}`);
         this.emit('message', { type: 'error', error: msg, session_id: actualSessionId || sid });
       }
     });
     proc.on('close', (code) => {
       if (code !== 0 && buffer.trim()) {
-        // попытка распарсить последний буфер как ошибку
+        const remaining = buffer.trim();
         try {
-          const err = JSON.parse(buffer.trim());
+          const err = JSON.parse(remaining);
           if (err?.data?.message) {
             this.emit('message', { type: 'error', error: err.data.message, session_id: actualSessionId || sid });
           }
-        } catch {}
+        } catch {
+          if (remaining.includes('Error') || remaining.includes('error')) {
+            this.emit('message', { type: 'error', error: remaining, session_id: actualSessionId || sid });
+          }
+        }
       }
       this.emit('done', { session_id: actualSessionId || sid });
     });
